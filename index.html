@@ -226,7 +226,6 @@ $('importButton').onclick=()=>$('importFile').click();$('importFile').onchange=a
 const DBX_KEY='kobun_dropbox_app_key_v1';
 const DBX_TOKEN='kobun_dropbox_token_v1';
 const DBX_VERIFIER='kobun_dropbox_pkce_verifier_v1';
-const DBX_STATE='kobun_dropbox_oauth_state_v1';
 const DBX_AUTH_STARTED='kobun_dropbox_oauth_started_v1';
 const DBX_FILE='/kobun_tango_backup.json';
 const REDIRECT_URI=location.origin+location.pathname;
@@ -268,21 +267,30 @@ async function dbxApi(path,accessToken,body){
 }
 async function finishDropboxOAuth(){
  const params=new URLSearchParams(location.search);
- const code=params.get('code'),state=params.get('state'),savedState=localStorage.getItem(DBX_STATE);
- if(params.has('error')){history.replaceState({},'',REDIRECT_URI);localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_STATE);localStorage.removeItem(DBX_AUTH_STARTED);dbxStatus('Dropbox接続がキャンセルまたは拒否されました。','error');return;}
+ const code=params.get('code');
+ if(params.has('error')){
+  history.replaceState({},'',REDIRECT_URI);
+  localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_AUTH_STARTED);
+  dbxStatus('Dropbox接続がキャンセルまたは拒否されました。','error');return;
+ }
  if(!code)return;
- history.replaceState({},'',REDIRECT_URI);
- const started=Number(localStorage.getItem(DBX_AUTH_STARTED)||0);
- if(!savedState||!state||state!==savedState||!started||Date.now()-started>15*60*1000){localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_STATE);localStorage.removeItem(DBX_AUTH_STARTED);dbxStatus('OAuth stateを確認できませんでした。接続画面を最初からやり直してください。','error');return;}
+ // OAuthの戻り先ではPKCE verifierと開始時刻だけを確認する。
+ // stateの保存・比較はブラウザーや複数タブ間の不整合を起こすため使用しない。
  const verifier=localStorage.getItem(DBX_VERIFIER);
+ const started=Number(localStorage.getItem(DBX_AUTH_STARTED)||0);
+ history.replaceState({},'',REDIRECT_URI);
+ if(!verifier||!started||Date.now()-started>15*60*1000){
+  localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_AUTH_STARTED);
+  dbxStatus('認証情報を引き継げませんでした。接続を開始したページと同じブラウザー・同じGitHub Pages URLで、もう一度接続してください。','error');return;
+ }
  const appKey=localStorage.getItem(DBX_KEY)||$('dropboxAppKey').value.trim();
- if(!verifier||!appKey){dbxStatus('認証情報が不足しています。最初から接続してください。','error');return;}
+ if(!appKey){dbxStatus('Dropbox App keyが見つかりません。接続画面から入力し直してください。','error');return;}
  try{
   const body=new URLSearchParams({code,grant_type:'authorization_code',client_id:appKey,redirect_uri:REDIRECT_URI,code_verifier:verifier});
   const res=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
   const data=await res.json();if(!res.ok)throw new Error(data.error_description||data.error||'トークン取得に失敗しました。');
   localStorage.setItem(DBX_TOKEN,JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token,expires_at:Date.now()+(data.expires_in||14400)*1000}));
-  localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_STATE);localStorage.removeItem(DBX_AUTH_STARTED);
+  localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_AUTH_STARTED);
   dbxStatus('Dropboxに接続済みです。','ok');
  }catch(e){dbxStatus('接続失敗：'+e.message,'error');}
 }
@@ -294,8 +302,8 @@ $('dropboxConnect').onclick=async()=>{
  localStorage.setItem(DBX_KEY,appKey);
  if(!crypto.subtle)return alert('このブラウザーでは安全なOAuth接続を利用できません。HTTPSのGitHub Pagesで開いてください。');
  try{
-  const verifier=randomVerifier(),state=randomVerifier();
-  localStorage.setItem(DBX_VERIFIER,verifier);localStorage.setItem(DBX_STATE,state);localStorage.setItem(DBX_AUTH_STARTED,String(Date.now()));
+  const verifier=randomVerifier();
+  localStorage.setItem(DBX_VERIFIER,verifier);localStorage.setItem(DBX_AUTH_STARTED,String(Date.now()));
   const challenge=base64url(await sha256(verifier));
   const params=new URLSearchParams({client_id:appKey,response_type:'code',redirect_uri:REDIRECT_URI,code_challenge:challenge,code_challenge_method:'S256',token_access_type:'offline',scope:'files.content.read files.content.write'});
   location.href='https://www.dropbox.com/oauth2/authorize?'+params.toString();
@@ -323,7 +331,7 @@ $('dropboxRestore').onclick=async()=>{
  }catch(e){dbxStatus('復元失敗：'+e.message,'error');alert(e.message);}
 };
 $('dropboxDisconnect').onclick=()=>{
- localStorage.removeItem(DBX_TOKEN);localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_STATE);localStorage.removeItem(DBX_AUTH_STARTED);
+ localStorage.removeItem(DBX_TOKEN);localStorage.removeItem(DBX_VERIFIER);localStorage.removeItem(DBX_AUTH_STARTED);
  dbxStatus('Dropbox接続情報を削除しました。');
 };
 (async()=>{
