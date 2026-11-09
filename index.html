@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#243b53">
+<title>古文単語テスト予習</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;color:#243247;background:#f3f6fa}
+*{box-sizing:border-box}body{margin:0}header{background:#243b53;color:white;padding:20px max(18px,calc((100% - 1050px)/2))}
+header h1{font-size:1.35rem;margin:0 0 5px}header p{margin:0;color:#dbe7f3;font-size:.9rem}
+main{max-width:1050px;margin:20px auto;padding:0 14px 50px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+button,.tab{border:0;border-radius:9px;padding:10px 14px;font:inherit;cursor:pointer;background:#e1e8f0;color:#243247}
+button.primary,.tab.active{background:#2764a5;color:white}button.danger{background:#fce5e5;color:#9b2525}button:disabled{opacity:.45;cursor:not-allowed}
+.panel{background:white;border:1px solid #e1e7ee;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px #19334b0a}
+h2{font-size:1.12rem;margin:0 0 14px}h3{font-size:1rem;margin:18px 0 8px}
+label{display:block;font-weight:650;font-size:.9rem;margin:12px 0 5px}
+input,textarea,select{width:100%;padding:10px 11px;border:1px solid #cbd5df;border-radius:8px;font:inherit;background:white;color:#243247}
+textarea{min-height:74px;resize:vertical}.hint,.muted{color:#64748b;font-size:.85rem}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.meaning-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin:7px 0}
+.meaning-row input[type=checkbox]{width:auto}.meaning-row label{margin:0;font-weight:500}
+.example-row{background:#f8fafc!important;border:1px solid #dce5ee!important;box-shadow:none!important;margin:12px 0!important}.example-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.example-head b{color:#315477}.dropbox-status{padding:10px 12px;border-radius:8px;background:#eef4fa;margin:10px 0;font-size:.9rem}.dropbox-status.ok{background:#e4f6eb}.dropbox-status.error{background:#fff0e8}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.unit-list,.word-list{display:grid;gap:8px}
+.unit-item,.word-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e1e7ee;border-radius:9px}
+.unit-item small,.word-item small{display:block;color:#64748b}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}.stat{background:#eef4fa;border-radius:9px;padding:9px 13px}
+.stat b{font-size:1.15rem;display:block}
+.quiz-word{font-size:1.65rem;font-weight:750;text-align:center;margin:20px 0}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.choice{background:#f3f6fa;border:1px solid #d6e0ea;text-align:left;min-height:48px}
+.choice.correct{background:#e0f5e8;border-color:#29985a}.choice.wrong{background:#fde8e8;border-color:#d44}
+.feedback{padding:13px;border-radius:9px;margin-top:12px;background:#eef4fa;line-height:1.65}
+.feedback.good{background:#e4f6eb}.feedback.bad{background:#fff0e8}
+.sentence{font-size:1.15rem;line-height:2.1;background:#f7f9fc;padding:14px;border-radius:9px}
+.hidden{display:none!important}.pill{font-size:.78rem;background:#fff1cf;color:#815500;padding:3px 7px;border-radius:20px}
+footer{text-align:center;color:#718096;font-size:.8rem;padding:12px}
+@media(max-width:620px){.row{grid-template-columns:1fr}.choices{grid-template-columns:1fr}.panel{padding:14px}.meaning-row{grid-template-columns:1fr auto auto}}
+</style>
+</head>
+<body>
+<header><h1>古文単語テスト予習</h1><p>単元ごとに単語を登録して、意味と例文を繰り返し練習できます。</p></header>
+<main>
+<nav>
+<button class="tab active" data-tab="study">問題を解く</button>
+<button class="tab" data-tab="edit">単語を登録・編集</button>
+<button class="tab" data-tab="review">苦手単語</button>
+<button class="tab" data-tab="manage">単元・データ管理</button>
+</nav>
+
+<section id="study" class="view">
+<div class="panel">
+<h2>出題設定</h2>
+<div class="row">
+<div><label for="studyUnit">単元</label><select id="studyUnit"></select></div>
+<div><label for="mode">問題形式</label><select id="mode"><option value="choice">単語のみ → 意味を5択</option><option value="sentence">例文 → 対象語句の意味を記述</option><option value="mixed">ランダム（両形式）</option></select></div>
+</div>
+<div class="actions"><button class="primary" id="startQuiz">この条件で出題開始</button><span class="hint" id="studyCount"></span></div>
+</div>
+<div class="panel hidden" id="quizPanel">
+<div class="stats"><div class="stat">今回の問題<b id="qNumber">1</b></div><div class="stat">今回の正解<b id="qCorrect">0</b></div></div>
+<div id="questionArea"></div>
+<div id="feedback" class="feedback hidden"></div>
+<div class="actions hidden" id="nextArea"><button class="primary" id="nextQuestion">次の問題</button><button id="endQuiz">終了</button></div>
+</div>
+</section>
+
+<section id="edit" class="view hidden">
+<div class="panel">
+<h2>単語を登録・編集</h2>
+<label for="editUnit">登録先の単元</label><select id="editUnit"></select>
+<input type="hidden" id="wordId">
+<div class="row">
+<div><label for="kana">単語（ひらがな）</label><input id="kana" placeholder="例：あはれなり"></div>
+<div><label for="kanji">単語（漢字）</label><input id="kanji" placeholder="例：哀れなり（任意）"></div>
+</div>
+<h3>意味（複数登録可能）</h3>
+<p class="hint">「重要」にチェックした意味は、出題・解説で優先的に扱います。</p>
+<div id="meanings"></div>
+<div class="actions"><button id="addMeaning">＋ 意味を追加</button></div>
+<label for="explanation">解説</label><textarea id="explanation" placeholder="語源、用法、覚え方など"></textarea>
+<h3>例文（複数登録可能）</h3>
+<p class="hint">「＋例文を追加」で必要な数だけ登録できます。原文・現代語訳・対象語句・出題する意味は、例文ごとにセットで保存されます。</p>
+<div id="examples"></div>
+<div class="actions"><button type="button" id="addExample">＋ 例文を追加</button></div>
+<div class="actions"><button class="primary" id="saveWord">単語を保存</button><button id="clearForm">入力をクリア</button></div>
+</div>
+<div class="panel"><h2>登録済み単語</h2><div id="wordList" class="word-list"></div></div>
+</section>
+
+<section id="review" class="view hidden">
+<div class="panel"><h2>苦手単語</h2><p class="hint">間違えた回数が多い順に表示します。正解すると間違い回数は減らさず、累計として記録します。</p><div id="reviewList" class="word-list"></div></div>
+</section>
+
+<section id="manage" class="view hidden">
+<div class="panel"><h2>単元管理</h2><label for="newUnit">新しい単元名</label><div class="row"><input id="newUnit" placeholder="例：第1章・助動詞"><button class="primary" id="addUnit">単元を追加</button></div><div id="unitList" class="unit-list" style="margin-top:12px"></div></div>
+<div class="panel"><h2>データのバックアップ</h2><p class="hint">通常の保存先はこのブラウザーです。JSONファイルで手動バックアップ・復元もできます。</p><div class="actions"><button class="primary" id="exportData">JSONを書き出す</button><button id="importButton">JSONを読み込む</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></div></div>
+<div class="panel"><h2>Dropbox連携</h2>
+<p class="hint">Dropboxに接続すると、単語・単元・苦手回数を1つのJSONファイルとして保存／復元できます。自動同期ではなく、必要なときに手動で操作します。</p>
+<label for="dropboxAppKey">Dropbox App key</label><input id="dropboxAppKey" autocomplete="off" placeholder="Dropbox Developer ConsoleのApp key">
+<p class="hint">Dropboxアプリは「Scoped access」「App folder」で作成し、権限 <code>files.content.read</code> と <code>files.content.write</code> を有効にしてください。OAuth Redirect URIには、このGitHub PagesのURLを完全一致で登録します。</p>
+<div id="dropboxStatus" class="dropbox-status">Dropbox未接続</div>
+<div class="actions"><button class="primary" id="dropboxConnect">Dropboxに接続</button><button id="dropboxBackup">Dropboxにバックアップ</button><button id="dropboxRestore">Dropboxから復元</button><button class="danger" id="dropboxDisconnect">接続情報を削除</button></div>
+<p class="hint">保存先：Dropboxアプリフォルダー内の <code>kobun_tango_backup.json</code></p>
+</div>
+</section>
+<footer>学習データは端末内（localStorage）に保存されます。</footer>
+</main>
+<script>
+const KEY='kobun_vocab_tool_v1';
+const $=id=>document.getElementById(id);
+let db=loadDB(), quiz=[], qi=0, correct=0, current=null, answered=false;
+function loadDB(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x&&Array.isArray(x.units)&&Array.isArray(x.words)){x.words=x.words.map(w=>({...w,examples:Array.isArray(w.examples)?w.examples:((w.original||w.target||w.translation)?[{original:w.original||'',target:w.target||'',translation:w.translation||'',meaningIndex:w.sentenceMeaning??null}]:[])}));return x}}catch(e){}return{units:['未分類'],words:[]}}
+function persist(){localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+function uid(){return 'w'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function activeUnit(){return $('studyUnit').value}
+function wordsFor(unit){return db.words.filter(w=>w.unit===unit)}
+function renderSelects(){['studyUnit','editUnit'].forEach(id=>{const el=$(id),old=el.value;el.innerHTML=db.units.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join('');if(db.units.includes(old))el.value=old});updateCount();renderWordList();renderReview();renderUnits();renderMeaningSelect()}
+function updateCount(){$('studyCount').textContent=`${wordsFor(activeUnit()).length}語 登録済み`}
+function renderAll(){renderSelects()}
+function addMeaningRow(value='',important=false){const wrap=document.createElement('div');wrap.className='meaning-row';wrap.innerHTML=`<input class="meaning-text" placeholder="意味を入力" value="${esc(value)}"><label><input type="checkbox" class="meaning-important" ${important?'checked':''}> 重要</label><button type="button" class="danger remove-meaning">削除</button>`;wrap.querySelector('.remove-meaning').onclick=()=>{wrap.remove();renderMeaningSelect()};wrap.querySelector('.meaning-text').oninput=renderMeaningSelect;wrap.querySelector('.meaning-important').onchange=renderMeaningSelect;$('meanings').appendChild(wrap);renderMeaningSelect()}
+function getMeanings(){return [...document.querySelectorAll('.meaning-row')].map(r=>({text:r.querySelector('.meaning-text').value.trim(),important:r.querySelector('.meaning-important').checked})).filter(m=>m.text)}
+function renderMeaningSelect(){
+ const ms=getMeanings();
+ document.querySelectorAll('.example-meaning').forEach(sel=>{
+  const old=sel.value;
+  sel.innerHTML='<option value="">選択してください</option>'+ms.map((m,i)=>`<option value="${i}">${esc(m.text)}${m.important?' ★':''}</option>`).join('');
+  if(old!=='' && ms[Number(old)])sel.value=old;
+ });
+}
+function addExampleRow(example={}){
+ const wrap=document.createElement('div');
+ wrap.className='panel example-row';
+ wrap.innerHTML=`
+  <div class="example-head"><b class="example-heading">例文</b><button type="button" class="danger remove-example">この例文を削除</button></div>
+  <label>例文原文</label><textarea class="example-original" placeholder="例：あはれなることも多かり。">${esc(example.original||'')}</textarea>
+  <label>例文中の対象語句</label><input class="example-target" placeholder="例：あはれなる（原文中の表記）" value="${esc(example.target||'')}">
+  <label>例文現代語訳</label><textarea class="example-translation" placeholder="例：しみじみと心を打つことも多い。">${esc(example.translation||'')}</textarea>
+  <label>この例文で出題する意味</label><select class="example-meaning"><option value="">選択してください</option></select>`;
+ wrap.querySelector('.remove-example').onclick=()=>{wrap.remove();renumberExamples()};
+ $('examples').appendChild(wrap);
+ renderMeaningSelect();
+ if(example.meaningIndex!==undefined && example.meaningIndex!==null) wrap.querySelector('.example-meaning').value=String(example.meaningIndex);
+ renumberExamples();
+}
+function renumberExamples(){
+ document.querySelectorAll('.example-row').forEach((r,i)=>r.querySelector('.example-heading').textContent=`例文 ${i+1}`);
+}
+function getExamples(){
+ return [...document.querySelectorAll('.example-row')].map(r=>({
+  original:r.querySelector('.example-original').value.trim(),
+  target:r.querySelector('.example-target').value.trim(),
+  translation:r.querySelector('.example-translation').value.trim(),
+  meaningIndex:r.querySelector('.example-meaning').value===''?null:Number(r.querySelector('.example-meaning').value)
+ })).filter(e=>e.original||e.target||e.translation);
+}
+function normalizeExamples(w){
+ if(Array.isArray(w.examples)) return w.examples;
+ if(w.original||w.target||w.translation) return [{original:w.original||'',target:w.target||'',translation:w.translation||'',meaningIndex:w.sentenceMeaning??null}];
+ return [];
+}
+function clearForm(){['wordId','kana','kanji','explanation'].forEach(id=>$(id).value='');$('meanings').innerHTML='';$('examples').innerHTML='';addMeaningRow();$('saveWord').textContent='単語を保存'}
+function editWord(id){const w=db.words.find(x=>x.id===id);if(!w)return;$('editUnit').value=w.unit;$('wordId').value=w.id;$('kana').value=w.kana;$('kanji').value=w.kanji||'';$('explanation').value=w.explanation||'';$('meanings').innerHTML='';w.meanings.forEach(m=>addMeaningRow(m.text,m.important));$('examples').innerHTML='';normalizeExamples(w).forEach(e=>addExampleRow(e));$('saveWord').textContent='変更を保存';showTab('edit');window.scrollTo(0,0)}
+function renderWordList(){const list=$('wordList');if(!list)return;const arr=wordsFor($('editUnit').value||db.units[0]);list.innerHTML=arr.length?arr.map(w=>`<div class="word-item"><div><b>${esc(w.kana)}</b> ${w.kanji?`<small>${esc(w.kanji)}</small>`:''}<small>${esc(w.meanings.map(m=>m.text).join('／'))} ・ 間違い ${w.wrong||0}回</small></div><div class="actions"><button data-edit="${w.id}">編集</button><button class="danger" data-delete="${w.id}">削除</button></div></div>`).join(''):'<p class="muted">この単元にはまだ単語がありません。</p>';list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editWord(b.dataset.edit));list.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('この単語を削除しますか？')){db.words=db.words.filter(w=>w.id!==b.dataset.delete);persist()}})}
+function renderReview(){const list=$('reviewList');if(!list)return;const arr=[...db.words].filter(w=>(w.wrong||0)>0).sort((a,b)=>(b.wrong||0)-(a.wrong||0));list.innerHTML=arr.length?arr.map(w=>`<div class="word-item"><div><b>${esc(w.kana)}</b><small>${esc(w.unit)} ・ ${esc(w.meanings.map(m=>m.text).join('／'))}</small></div><span class="pill">間違い ${w.wrong}回</span></div>`).join(''):'<p class="muted">まだ間違えた単語はありません。</p>'}
+function renderUnits(){const list=$('unitList');if(!list)return;list.innerHTML=db.units.map(u=>`<div class="unit-item"><div><b>${esc(u)}</b><small>${wordsFor(u).length}語</small></div><button class="danger" data-unit="${esc(u)}" ${db.units.length===1?'disabled':''}>単元を削除</button></div>`).join('');list.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>{const u=b.dataset.unit;if(!confirm(`「${u}」と登録単語をすべて削除しますか？`))return;db.units=db.units.filter(x=>x!==u);db.words=db.words.filter(w=>w.unit!==u);persist()})}
+function showTab(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('hidden',v.id!==id));document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));if(id==='edit')renderWordList();if(id==='review')renderReview()}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$('addMeaning').onclick=()=>addMeaningRow();$('addExample').onclick=()=>addExampleRow();$('clearForm').onclick=clearForm;
+$('editUnit').onchange=renderWordList;$('studyUnit').onchange=updateCount;
+$('addUnit').onclick=()=>{const u=$('newUnit').value.trim();if(!u)return alert('単元名を入力してください。');if(db.units.includes(u))return alert('同じ名前の単元があります。');db.units.push(u);$('newUnit').value='';persist();$('editUnit').value=u;$('studyUnit').value=u};
+$('saveWord').onclick=()=>{
+ const unit=$('editUnit').value,kana=$('kana').value.trim(),meanings=getMeanings(),examples=getExamples();
+ if(!kana)return alert('ひらがなの単語を入力してください。');
+ if(!meanings.length)return alert('意味を1つ以上入力してください。');
+ for(let i=0;i<examples.length;i++){
+  const e=examples[i];
+  if(!e.original||!e.translation||!e.target)return alert(`例文 ${i+1} の原文・対象語句・現代語訳をすべて入力してください。`);
+  if(e.meaningIndex===null)return alert(`例文 ${i+1} の「出題する意味」を選択してください。`);
+  if(!meanings[e.meaningIndex])return alert(`例文 ${i+1} の出題する意味を選び直してください。`);
+  if(!e.original.includes(e.target))return alert(`例文 ${i+1} の対象語句「${e.target}」が原文に見つかりません。原文中の表記と一致させてください。`);
+ }
+ const old=db.words.find(w=>w.id===$('wordId').value);
+ const w={id:old?.id||uid(),unit,kana,kanji:$('kanji').value.trim(),meanings,explanation:$('explanation').value.trim(),examples,wrong:old?.wrong||0,attempts:old?.attempts||0};
+ if(old)db.words=db.words.map(x=>x.id===old.id?w:x);else db.words.push(w);
+ persist();clearForm();alert('保存しました。');
+};
+$('startQuiz').onclick=()=>{const arr=wordsFor(activeUnit()).filter(w=>w.meanings.length);if(!arr.length)return alert('この単元に出題できる単語がありません。');quiz=arr.map(w=>({...w})).sort(()=>Math.random()-.5);qi=0;correct=0;$('quizPanel').classList.remove('hidden');showQuestion();$('quizPanel').scrollIntoView({behavior:'smooth'})};
+function showQuestion(){
+ if(qi>=quiz.length){
+  $('questionArea').innerHTML=`<h2>終了！</h2><p>全${quiz.length}問中 ${correct}問正解</p>`;
+  $('feedback').classList.add('hidden');$('nextArea').classList.remove('hidden');$('nextQuestion').textContent='最初から解く';return;
+ }
+ current=quiz[qi];answered=false;
+ $('qNumber').textContent=`${qi+1} / ${quiz.length}`;$('qCorrect').textContent=correct;
+ $('feedback').classList.add('hidden');$('nextArea').classList.add('hidden');
+ const mode=$('mode').value==='mixed'?(Math.random()<.5?'choice':'sentence'):$('mode').value;
+ const validExamples=normalizeExamples(current).filter(e=>e.original&&e.target&&e.translation&&e.meaningIndex!==null&&current.meanings[e.meaningIndex]);
+ if(mode==='sentence'&&validExamples.length){
+  current.activeExample=validExamples[Math.floor(Math.random()*validExamples.length)];
+  showSentence();
+ }else{current.activeExample=null;showChoice();}
+}
+function showChoice(){const correctMeaning=current.meanings.find(m=>m.important)||current.meanings[0];let pool=db.words.flatMap(w=>w.meanings.map(m=>m.text)).filter(t=>t!==correctMeaning.text);pool=[...new Set(pool)].sort(()=>Math.random()-.5).slice(0,4);while(pool.length<4)pool.push(['正しい意味ではない','別の意味','誤った選択肢','関係のない意味'][pool.length]);const opts=[...pool,correctMeaning.text].sort(()=>Math.random()-.5);$('questionArea').innerHTML=`<div class="muted" style="text-align:center">次の古文単語の意味は？</div><div class="quiz-word">${esc(current.kana)}${current.kanji?` <small>（${esc(current.kanji)}）</small>`:''}</div><div class="choices">${opts.map((t,i)=>`<button class="choice" data-choice="${i}">${i+1}. ${esc(t)}</button>`).join('')}</div>`;[...$('questionArea').querySelectorAll('[data-choice]')].forEach(b=>b.onclick=()=>answerChoice(b,correctMeaning.text))}
+function showSentence(){
+ const ex=current.activeExample;
+ let sentence=esc(ex.original);
+ sentence=sentence.replace(esc(ex.target),`<u><b>${esc(ex.target)}</b></u>`);
+ $('questionArea').innerHTML=`<div class="muted">傍線部の意味を答えよう。</div><div class="sentence">${sentence}</div><label for="writtenAnswer">対象語句の現代語訳</label><input id="writtenAnswer" placeholder="意味を入力"><p class="hint">答えを入力したら「答えを見る」を押してください。</p><div class="actions"><button class="primary" id="reveal">答えを見る</button></div>`;
+ $('reveal').onclick=()=>{
+  if(!$('writtenAnswer').value.trim())return alert('答えを入力してください。');
+  const m=current.meanings[ex.meaningIndex];
+  $('writtenAnswer').disabled=true;gradeSentence(m.text);
+ };
+}
+function answerChoice(btn,correctText){if(answered)return;answered=true;const chosen=btn.textContent.replace(/^\d+\. /,'');const ok=chosen===correctText;document.querySelectorAll('.choice').forEach(b=>{b.disabled=true;const t=b.textContent.replace(/^\d+\. /,'');if(t===correctText)b.classList.add('correct');else if(b===btn)b.classList.add('wrong')});finishAnswer(ok,correctText)}
+function gradeSentence(correctText){const given=$('writtenAnswer').value.trim();const ok=given===correctText;finishAnswer(ok,correctText,`あなたの解答：${esc(given)}<br>`)}
+function finishAnswer(ok,answer,extra=''){answered=true;const w=db.words.find(x=>x.id===current.id);if(w){w.attempts=(w.attempts||0)+1;if(!ok)w.wrong=(w.wrong||0)+1;localStorage.setItem(KEY,JSON.stringify(db))}if(ok)correct++;$('qCorrect').textContent=correct;const meanings=current.meanings.map(m=>`${m.important?'★ ':''}${esc(m.text)}`).join('／');$('feedback').className='feedback '+(ok?'good':'bad');$('feedback').innerHTML=`<b>${ok?'正解！':'不正解'}</b><br>${extra}正解：${esc(answer)}<br>意味一覧：${meanings}${current.explanation?`<br><br><b>解説</b><br>${esc(current.explanation).replace(/\n/g,'<br>')}`:''}${current.activeExample?`<br><br><b>例文</b><br>${esc(current.activeExample.original)}<br>${esc(current.activeExample.translation)}`:''}`;$('feedback').classList.remove('hidden');$('nextArea').classList.remove('hidden');$('nextQuestion').textContent=qi===quiz.length-1?'結果を見る':'次の問題'}
+$('nextQuestion').onclick=()=>{if(qi>=quiz.length){qi=0;correct=0;quiz.sort(()=>Math.random()-.5)}else qi++;showQuestion()};$('endQuiz').onclick=()=>{$('quizPanel').classList.add('hidden')};
+$('exportData').onclick=()=>{const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='kobun-tango-backup.json';a.click();URL.revokeObjectURL(a.href)};
+$('importButton').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!Array.isArray(x.units)||!Array.isArray(x.words))throw Error();if(!confirm('現在のデータを読み込んだデータで置き換えますか？'))return;db=x;persist();alert('読み込みました。')}catch(err){alert('読み込めませんでした。JSONファイルを確認してください。')}e.target.value=''};
+
+// Dropbox OAuth 2.0 PKCE（App keyのみ。App secretはHTMLに置かない）
+const DBX_KEY='kobun_dropbox_app_key_v1';
+const DBX_TOKEN='kobun_dropbox_token_v1';
+const DBX_VERIFIER='kobun_dropbox_pkce_verifier_v1';
+const DBX_FILE='/kobun_tango_backup.json';
+const REDIRECT_URI=location.origin+location.pathname;
+function dbxStatus(message,kind=''){
+ const el=$('dropboxStatus');if(el){el.textContent=message;el.className='dropbox-status '+kind;}
+}
+function base64url(bytes){
+ let binary='';bytes.forEach(b=>binary+=String.fromCharCode(b));
+ return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function sha256(text){
+ const data=new TextEncoder().encode(text);
+ return new Uint8Array(await crypto.subtle.digest('SHA-256',data));
+}
+function randomVerifier(){
+ const bytes=new Uint8Array(64);crypto.getRandomValues(bytes);
+ return base64url(bytes);
+}
+function dbxAccess(){
+ try{return JSON.parse(localStorage.getItem(DBX_TOKEN)||'null')}catch(e){return null}
+}
+async function dbxToken(){
+ const token=dbxAccess();
+ if(!token)return null;
+ if(token.access_token && token.expires_at>Date.now()+60000)return token.access_token;
+ if(!token.refresh_token)throw new Error('Dropboxの認証期限が切れました。再接続してください。');
+ const appKey=$('dropboxAppKey').value.trim()||localStorage.getItem(DBX_KEY)||'';
+ const body=new URLSearchParams({grant_type:'refresh_token',refresh_token:token.refresh_token,client_id:appKey});
+ const res=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+ const data=await res.json();if(!res.ok)throw new Error(data.error_description||data.error||'アクセストークンを更新できませんでした。');
+ const updated={...token,access_token:data.access_token,expires_at:Date.now()+(data.expires_in||14400)*1000};
+ localStorage.setItem(DBX_TOKEN,JSON.stringify(updated));return updated.access_token;
+}
+async function dbxApi(path,accessToken,body){
+ const res=await fetch('https://api.dropboxapi.com'+path,{method:'POST',headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(data.error_summary||data.error||`Dropbox API error (${res.status})`);
+ return data;
+}
+async function finishDropboxOAuth(){
+ const params=new URLSearchParams(location.search);
+ const code=params.get('code'),state=params.get('state'),savedState=sessionStorage.getItem('kobun_dbx_state');
+ if(params.has('error')){dbxStatus('Dropbox接続がキャンセルまたは拒否されました。','error');history.replaceState({},'',REDIRECT_URI);return;}
+ if(!code)return;
+ history.replaceState({},'',REDIRECT_URI);
+ if(!savedState||state!==savedState){dbxStatus('OAuth stateが一致しません。最初から接続してください。','error');return;}
+ const verifier=sessionStorage.getItem(DBX_VERIFIER);
+ const appKey=localStorage.getItem(DBX_KEY)||$('dropboxAppKey').value.trim();
+ if(!verifier||!appKey){dbxStatus('認証情報が不足しています。最初から接続してください。','error');return;}
+ try{
+  const body=new URLSearchParams({code,grant_type:'authorization_code',client_id:appKey,redirect_uri:REDIRECT_URI,code_verifier:verifier});
+  const res=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+  const data=await res.json();if(!res.ok)throw new Error(data.error_description||data.error||'トークン取得に失敗しました。');
+  localStorage.setItem(DBX_TOKEN,JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token,expires_at:Date.now()+(data.expires_in||14400)*1000}));
+  sessionStorage.removeItem(DBX_VERIFIER);sessionStorage.removeItem('kobun_dbx_state');
+  dbxStatus('Dropboxに接続済みです。','ok');
+ }catch(e){dbxStatus('接続失敗：'+e.message,'error');}
+}
+$('dropboxAppKey').value=localStorage.getItem(DBX_KEY)||'';
+$('dropboxAppKey').onchange=()=>localStorage.setItem(DBX_KEY,$('dropboxAppKey').value.trim());
+$('dropboxConnect').onclick=async()=>{
+ const appKey=$('dropboxAppKey').value.trim();
+ if(!appKey)return alert('Dropbox App keyを入力してください。');
+ localStorage.setItem(DBX_KEY,appKey);
+ if(!crypto.subtle)return alert('このブラウザーでは安全なOAuth接続を利用できません。HTTPSのGitHub Pagesで開いてください。');
+ try{
+  const verifier=randomVerifier(),state=randomVerifier();
+  sessionStorage.setItem(DBX_VERIFIER,verifier);sessionStorage.setItem('kobun_dbx_state',state);
+  const challenge=base64url(await sha256(verifier));
+  const params=new URLSearchParams({client_id:appKey,response_type:'code',redirect_uri:REDIRECT_URI,code_challenge:challenge,code_challenge_method:'S256',token_access_type:'offline',scope:'files.content.read files.content.write'});
+  location.href='https://www.dropbox.com/oauth2/authorize?'+params.toString();
+ }catch(e){dbxStatus('接続開始に失敗：'+e.message,'error');}
+};
+$('dropboxBackup').onclick=async()=>{
+ try{
+  const access=await dbxToken();if(!access)return alert('先にDropboxへ接続してください。');
+  const contents=JSON.stringify(db,null,2);
+  const res=await fetch('https://content.dropboxapi.com/2/files/upload',{method:'POST',headers:{'Authorization':'Bearer '+access,'Dropbox-API-Arg':JSON.stringify({path:DBX_FILE,mode:'overwrite',autorename:false,mute:true}), 'Content-Type':'application/octet-stream'},body:contents});
+  const data=await res.json();if(!res.ok)throw new Error(data.error_summary||'アップロードに失敗しました。');
+  dbxStatus('バックアップ完了：'+new Date().toLocaleString(),'ok');
+ }catch(e){dbxStatus('バックアップ失敗：'+e.message,'error');alert(e.message);}
+};
+$('dropboxRestore').onclick=async()=>{
+ if(!confirm('現在の学習データをDropboxのバックアップで置き換えますか？'))return;
+ try{
+  const access=await dbxToken();if(!access)return alert('先にDropboxへ接続してください。');
+  const res=await fetch('https://content.dropboxapi.com/2/files/download',{method:'POST',headers:{'Authorization':'Bearer '+access,'Dropbox-API-Arg':JSON.stringify({path:DBX_FILE})}});
+  if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error_summary||'ダウンロードに失敗しました。');}
+  const imported=JSON.parse(await res.text());
+  if(!Array.isArray(imported.units)||!Array.isArray(imported.words))throw new Error('バックアップ形式が正しくありません。');
+  imported.words=imported.words.map(w=>({...w,examples:normalizeExamples(w)}));
+  db=imported;persist();dbxStatus('Dropboxから復元しました：'+new Date().toLocaleString(),'ok');alert('復元しました。');
+ }catch(e){dbxStatus('復元失敗：'+e.message,'error');alert(e.message);}
+};
+$('dropboxDisconnect').onclick=()=>{
+ localStorage.removeItem(DBX_TOKEN);sessionStorage.removeItem(DBX_VERIFIER);sessionStorage.removeItem('kobun_dbx_state');
+ dbxStatus('Dropbox接続情報を削除しました。');
+};
+(async()=>{
+ await finishDropboxOAuth();
+ if(dbxAccess() && $('dropboxStatus').textContent==='Dropbox未接続')dbxStatus('Dropboxに接続済みです。','ok');
+})();
+
+renderAll();clearForm();
+</script>
+</body></html>
