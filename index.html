@@ -20,7 +20,7 @@ input,textarea,select{width:100%;padding:10px 11px;border:1px solid #cbd5df;bord
 textarea{min-height:74px;resize:vertical}.hint,.muted{color:#64748b;font-size:.85rem}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .meaning-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin:7px 0}
 .meaning-row input[type=checkbox]{width:auto}.meaning-row label{margin:0;font-weight:500}
-.example-row{background:#f8fafc!important;border:1px solid #dce5ee!important;box-shadow:none!important;margin:12px 0!important}.example-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.example-head b{color:#315477}.dropbox-status{padding:10px 12px;border-radius:8px;background:#eef4fa;margin:10px 0;font-size:.9rem}.dropbox-status.ok{background:#e4f6eb}.dropbox-status.error{background:#fff0e8}
+.example-row{background:#f8fafc!important;border:1px solid #dce5ee!important;box-shadow:none!important;margin:12px 0!important}.example-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.example-head b{color:#315477}#aiImportText{font-family:ui-monospace,monospace;font-size:.88rem;min-height:190px}.dropbox-status{padding:10px 12px;border-radius:8px;background:#eef4fa;margin:10px 0;font-size:.9rem}.dropbox-status.ok{background:#e4f6eb}.dropbox-status.error{background:#fff0e8}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .unit-list,.word-list{display:grid;gap:8px}
 .unit-item,.word-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e1e7ee;border-radius:9px}
@@ -86,6 +86,18 @@ footer{text-align:center;color:#718096;font-size:.8rem;padding:12px}
 <div class="actions"><button type="button" id="addExample">＋ 例文を追加</button></div>
 <div class="actions"><button class="primary" id="saveWord">単語を保存</button><button id="clearForm">入力をクリア</button></div>
 </div>
+
+<div class="panel" id="aiImportPanel">
+<h2>AIの出力からまとめて登録</h2>
+<p class="hint">画像をAIに読み込ませ、下の専用プロンプトに従ってJSONを出力させてください。出力を貼り付けて内容を確認し、まとめて登録できます。通常の手入力もこれまで通り使えます。</p>
+<div class="actions"><button type="button" id="copyAiPrompt" class="primary">AI用プロンプトをコピー</button></div>
+<label for="aiImportText">AIが出力したJSON</label>
+<textarea id="aiImportText" rows="10" placeholder='{"words":[{"kana":"あはれなり","kanji":"哀れなり","meanings":[{"text":"しみじみと趣深い","important":true}],"explanation":"","examples":[]} ]}'></textarea>
+<p class="hint">登録先は上の「登録先の単元」で選択中の単元です。貼り付けると自動で形式を確認します。</p>
+<div id="aiImportStatus" class="dropbox-status">JSONを貼り付けてください。</div>
+<div class="actions"><button type="button" id="registerAiWords" class="primary" disabled>この内容でまとめて登録</button><button type="button" id="clearAiImport">クリア</button></div>
+</div>
+
 <div class="panel"><h2>登録済み単語</h2><div id="wordList" class="word-list"></div></div>
 </section>
 
@@ -187,6 +199,139 @@ $('saveWord').onclick=()=>{
  if(old)db.words=db.words.map(x=>x.id===old.id?w:x);else db.words.push(w);
  persist();clearForm();alert('保存しました。');
 };
+
+// AI画像読み取り用プロンプトと一括登録
+const AI_IMPORT_PROMPT = `あなたは古文単語帳のデータ入力アシスタントです。
+添付された画像に写っている古文単語・意味・解説・例文を読み取り、次のJSON形式だけで出力してください。Markdownのコードブロックや前置き・説明文は付けないでください。
+
+【出力形式】
+{
+  "words": [
+    {
+      "kana": "単語のひらがな表記",
+      "kanji": "漢字表記。不明・記載なしなら空文字",
+      "meanings": [
+        { "text": "意味1", "important": true },
+        { "text": "意味2", "important": false }
+      ],
+      "explanation": "画像に解説があれば記載。なければ空文字",
+      "examples": [
+        {
+          "original": "例文の原文",
+          "target": "例文中の対象語句（原文と同じ表記）",
+          "translation": "例文の現代語訳",
+          "meaning": "この例文で問う対象語句の意味。上のmeanings内のtextと完全一致させる"
+        }
+      ]
+    }
+  ]
+}
+
+【厳守事項】
+- 画像に載っている単語をすべて、上から順番に words 配列へ入れてください。一度に複数単語を出力してください。
+- kanaは必ずひらがなにしてください。漢字表記がない場合はkanjiを空文字にしてください。
+- 意味が複数ある場合は meanings にすべて登録してください。重要な意味が明示されている場合だけ important を true にし、それ以外は false にしてください。
+- 意味の順番・表現は、できるだけ画像の記載どおりにしてください。画像にない意味を推測で追加しないでください。
+- 例文が複数ある場合は examples にすべて入れてください。例文がなければ空配列 [] にしてください。
+- targetは原文中に実在する文字列をそのまま抜き出してください。
+- 各例文のmeaningは、対応する meanings のtextと一字一句同じにしてください。
+- 例文の現代語訳が画像にない場合は、勝手に作らず、その例文を登録しないでください。
+- 読み取れない文字や確信が持てない箇所は、推測せず、該当フィールドに「要確認」と入れてください。
+- explanationには画像に書かれた補足だけを入れ、独自の解説を追加しないでください。
+- JSONとして正しく解析できるよう、改行・引用符・カンマを正しく使ってください。
+- JSON以外は一切出力しないでください。`;
+
+function setAiImportStatus(message, kind='') {
+  const el = $('aiImportStatus');
+  el.textContent = message;
+  el.className = 'dropbox-status ' + kind;
+}
+function parseAiImportText() {
+  const raw = $('aiImportText').value.trim();
+  $('registerAiWords').disabled = true;
+  if (!raw) {
+    setAiImportStatus('JSONを貼り付けてください。');
+    return null;
+  }
+  try {
+    let cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (!parsed || !Array.isArray(parsed.words) || parsed.words.length === 0) {
+      throw new Error('最上位に1件以上の words 配列が必要です。');
+    }
+    const unit = $('editUnit').value;
+    const existing = new Set(wordsFor(unit).map(w => w.kana.trim()));
+    const batch = new Set();
+    const normalized = parsed.words.map((item, index) => {
+      const n = index + 1;
+      if (!item || typeof item !== 'object') throw new Error(`${n}語目：データ形式が正しくありません。`);
+      const kana = String(item.kana || '').trim();
+      if (!kana || kana === '要確認') throw new Error(`${n}語目：読み（ひらがな）が未確定です。画像を確認して修正してください。`);
+      if (existing.has(kana) || batch.has(kana)) throw new Error(`${n}語目「${kana}」：同じ単元に同じ読みの単語が既にあります（または今回のデータ内で重複しています）。`);
+      batch.add(kana);
+      if (!Array.isArray(item.meanings) || item.meanings.length === 0) throw new Error(`${n}語目「${kana}」：meaningsを1つ以上登録してください。`);
+      const meanings = item.meanings.map((m, mi) => {
+        const text = String(typeof m === 'string' ? m : (m?.text || '')).trim();
+        if (!text || text === '要確認') throw new Error(`${n}語目「${kana}」：${mi+1}番目の意味が未確定です。`);
+        return {text, important: typeof m === 'object' && m !== null ? !!m.important : false};
+      });
+      const examplesIn = item.examples == null ? [] : item.examples;
+      if (!Array.isArray(examplesIn)) throw new Error(`${n}語目「${kana}」：examplesは配列にしてください。`);
+      const examples = examplesIn.map((e, ei) => {
+        const original = String(e?.original || '').trim();
+        const target = String(e?.target || '').trim();
+        const translation = String(e?.translation || '').trim();
+        const meaning = String(e?.meaning || '').trim();
+        if (!original || !target || !translation) throw new Error(`${n}語目「${kana}」の例文${ei+1}：原文・対象語句・現代語訳が必要です。`);
+        if (!original.includes(target)) throw new Error(`${n}語目「${kana}」の例文${ei+1}：対象語句「${target}」が原文にありません。`);
+        const meaningIndex = meanings.findIndex(m => m.text === meaning);
+        if (meaningIndex < 0) throw new Error(`${n}語目「${kana}」の例文${ei+1}：meaningを meanings のtextと完全一致させてください。`);
+        return {original, target, translation, meaningIndex};
+      });
+      return {
+        id: uid(), unit, kana,
+        kanji: String(item.kanji || '').trim(),
+        meanings,
+        explanation: String(item.explanation || '').trim(),
+        examples, wrong: 0, attempts: 0
+      };
+    });
+    $('registerAiWords').disabled = false;
+    setAiImportStatus(`${normalized.length}語を確認しました。登録先：「${unit}」。内容を確認してから「この内容でまとめて登録」を押してください。`, 'ok');
+    return normalized;
+  } catch (e) {
+    setAiImportStatus('形式を確認できません：' + e.message, 'error');
+    return null;
+  }
+}
+$('copyAiPrompt').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(AI_IMPORT_PROMPT);
+    setAiImportStatus('AI用プロンプトをコピーしました。画像と一緒にAIへ貼り付けてください。', 'ok');
+  } catch (e) {
+    $('aiImportText').value = AI_IMPORT_PROMPT;
+    setAiImportStatus('クリップボードにコピーできなかったため、テキスト欄にプロンプトを表示しました。必要ならコピーしてください。', 'error');
+  }
+};
+$('aiImportText').addEventListener('input', parseAiImportText);
+$('aiImportText').addEventListener('paste', () => setTimeout(parseAiImportText, 0));
+$('registerAiWords').onclick = () => {
+  const words = parseAiImportText();
+  if (!words) return;
+  if (!confirm(`${words.length}語を「${$('editUnit').value}」に登録します。よろしいですか？`)) return;
+  db.words.push(...words);
+  persist();
+  $('aiImportText').value = '';
+  $('registerAiWords').disabled = true;
+  setAiImportStatus(`${words.length}語を登録しました。`, 'ok');
+  alert(`${words.length}語を登録しました。`);
+};
+$('clearAiImport').onclick = () => {
+  $('aiImportText').value = '';
+  $('registerAiWords').disabled = true;
+  setAiImportStatus('JSONを貼り付けてください。');
+};
+
 $('startQuiz').onclick=()=>{const arr=wordsFor(activeUnit()).filter(w=>w.meanings.length);if(!arr.length)return alert('この単元に出題できる単語がありません。');quiz=arr.map(w=>({...w})).sort(()=>Math.random()-.5);qi=0;correct=0;$('quizPanel').classList.remove('hidden');showQuestion();$('quizPanel').scrollIntoView({behavior:'smooth'})};
 function showQuestion(){
  if(qi>=quiz.length){
