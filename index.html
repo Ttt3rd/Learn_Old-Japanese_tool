@@ -348,7 +348,40 @@ function showQuestion(){
   showSentence();
  }else{current.activeExample=null;showChoice();}
 }
-function showChoice(){const correctMeaning=current.meanings.find(m=>m.important)||current.meanings[0];let pool=db.words.flatMap(w=>w.meanings.map(m=>m.text)).filter(t=>t!==correctMeaning.text);pool=[...new Set(pool)].sort(()=>Math.random()-.5).slice(0,4);while(pool.length<4)pool.push(['正しい意味ではない','別の意味','誤った選択肢','関係のない意味'][pool.length]);const opts=[...pool,correctMeaning.text].sort(()=>Math.random()-.5);$('questionArea').innerHTML=`<div class="muted" style="text-align:center">次の古文単語の意味は？</div><div class="quiz-word">${esc(current.kana)}${current.kanji?` <small>（${esc(current.kanji)}）</small>`:''}</div><div class="choices">${opts.map((t,i)=>`<button class="choice" data-choice="${i}">${i+1}. ${esc(t)}</button>`).join('')}</div>`;[...$('questionArea').querySelectorAll('[data-choice]')].forEach(b=>b.onclick=()=>answerChoice(b,correctMeaning.text))}
+function showChoice(){
+ // 正解は従来どおり「重要」優先で1つ選ぶ。
+ const correctMeaning=current.meanings.find(m=>m.important)||current.meanings[0];
+ const correctText=String(correctMeaning.text).trim();
+
+ // 同じ単語に登録された意味は、正解以外もすべて誤答候補から除外する。
+ // これにより、複数の意味を持つ単語の別解が選択肢に混ざるのを防ぐ。
+ const allValidMeanings=new Set(
+  current.meanings.map(m=>String(m.text||'').trim()).filter(Boolean)
+ );
+
+ // 他の単語に登録されている意味だけを誤答候補にする。重複も除去。
+ let pool=[...new Set(
+  db.words.flatMap(w=>(w.meanings||[]).map(m=>String(m.text||'').trim()))
+ )].filter(t=>t && !allValidMeanings.has(t));
+
+ // 誤答候補が4つに満たない場合は、正解・登録済みの別解と重ならない補助選択肢を追加。
+ const fallback=['正しい意味ではない','別の意味','誤った選択肢','関係のない意味'];
+ let fallbackIndex=0;
+ while(pool.length<4){
+  let candidate=fallback[fallbackIndex]||`誤答候補 ${fallbackIndex+1}`;
+  fallbackIndex++;
+  while(allValidMeanings.has(candidate)||pool.includes(candidate)){
+   candidate=`${fallback[fallbackIndex]||'誤答候補'} ${fallbackIndex+1}`;
+   fallbackIndex++;
+  }
+  pool.push(candidate);
+ }
+
+ pool=pool.sort(()=>Math.random()-.5).slice(0,4);
+ const opts=[...pool,correctText].sort(()=>Math.random()-.5);
+ $('questionArea').innerHTML=`<div class="muted" style="text-align:center">次の古文単語の意味は？</div><div class="quiz-word">${esc(current.kana)}${current.kanji?` <small>（${esc(current.kanji)}）</small>`:''}</div><div class="choices">${opts.map((t,i)=>`<button class="choice" data-choice="${i}">${i+1}. ${esc(t)}</button>`).join('')}</div>`;
+ [...$('questionArea').querySelectorAll('[data-choice]')].forEach(b=>b.onclick=()=>answerChoice(b,correctText));
+}
 function showSentence(){
  const ex=current.activeExample;
  let sentence=esc(ex.original);
