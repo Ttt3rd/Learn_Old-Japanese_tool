@@ -135,12 +135,7 @@ function renderAll(){renderSelects()}
 function addMeaningRow(value='',important=false){const wrap=document.createElement('div');wrap.className='meaning-row';wrap.innerHTML=`<input class="meaning-text" placeholder="意味を入力" value="${esc(value)}"><label><input type="checkbox" class="meaning-important" ${important?'checked':''}> 重要</label><button type="button" class="danger remove-meaning">削除</button>`;wrap.querySelector('.remove-meaning').onclick=()=>{wrap.remove();renderMeaningSelect()};wrap.querySelector('.meaning-text').oninput=renderMeaningSelect;wrap.querySelector('.meaning-important').onchange=renderMeaningSelect;$('meanings').appendChild(wrap);renderMeaningSelect()}
 function getMeanings(){return [...document.querySelectorAll('.meaning-row')].map(r=>({text:r.querySelector('.meaning-text').value.trim(),important:r.querySelector('.meaning-important').checked})).filter(m=>m.text)}
 function renderMeaningSelect(){
- const ms=getMeanings();
- document.querySelectorAll('.example-meaning').forEach(sel=>{
-  const old=sel.value;
-  sel.innerHTML='<option value="">選択してください</option>'+ms.map((m,i)=>`<option value="${i}">${esc(m.text)}${m.important?' ★':''}</option>`).join('');
-  if(old!=='' && ms[Number(old)])sel.value=old;
- });
+ // 例文の出題意味は自由入力欄にするため、意味一覧からの選択肢生成は行わない。
 }
 function addExampleRow(example={}){
  const wrap=document.createElement('div');
@@ -150,11 +145,10 @@ function addExampleRow(example={}){
   <label>例文原文</label><textarea class="example-original" placeholder="例：あはれなることも多かり。">${esc(example.original||'')}</textarea>
   <label>例文中の対象語句</label><input class="example-target" placeholder="例：あはれなる（原文中の表記）" value="${esc(example.target||'')}">
   <label>例文現代語訳</label><textarea class="example-translation" placeholder="例：しみじみと心を打つことも多い。">${esc(example.translation||'')}</textarea>
-  <label>この例文で出題する意味</label><select class="example-meaning"><option value="">選択してください</option></select>`;
+  <label>この例文で出題する意味</label><input class="example-meaning" type="text" placeholder="例：しみじみと趣深い" value="${esc(example.meaningText ?? (example.meaningIndex!==undefined && example.meaningIndex!==null ? (getMeanings()[Number(example.meaningIndex)]?.text || '') : ''))}">
+  <p class="hint">単語に登録した意味のうち、この例文で問いたい意味をそのまま入力してください。</p>`;
  wrap.querySelector('.remove-example').onclick=()=>{wrap.remove();renumberExamples()};
  $('examples').appendChild(wrap);
- renderMeaningSelect();
- if(example.meaningIndex!==undefined && example.meaningIndex!==null) wrap.querySelector('.example-meaning').value=String(example.meaningIndex);
  renumberExamples();
 }
 function renumberExamples(){
@@ -165,8 +159,9 @@ function getExamples(){
   original:r.querySelector('.example-original').value.trim(),
   target:r.querySelector('.example-target').value.trim(),
   translation:r.querySelector('.example-translation').value.trim(),
-  meaningIndex:r.querySelector('.example-meaning').value===''?null:Number(r.querySelector('.example-meaning').value)
- })).filter(e=>e.original||e.target||e.translation);
+  meaningText:r.querySelector('.example-meaning').value.trim(),
+  meaningIndex:(()=>{const value=r.querySelector('.example-meaning').value.trim();return value===''?null:getMeanings().findIndex(m=>m.text===value)})()
+ })).filter(e=>e.original||e.target||e.translation||e.meaningText);
 }
 function normalizeExamples(w){
  if(Array.isArray(w.examples)) return w.examples;
@@ -190,8 +185,8 @@ $('saveWord').onclick=()=>{
  for(let i=0;i<examples.length;i++){
   const e=examples[i];
   if(!e.original||!e.translation||!e.target)return alert(`例文 ${i+1} の原文・対象語句・現代語訳をすべて入力してください。`);
-  if(e.meaningIndex===null)return alert(`例文 ${i+1} の「出題する意味」を選択してください。`);
-  if(!meanings[e.meaningIndex])return alert(`例文 ${i+1} の出題する意味を選び直してください。`);
+  if(!e.meaningText)return alert(`例文 ${i+1} の「出題する意味」を入力してください。`);
+  if(e.meaningIndex<0)return alert(`例文 ${i+1} の出題する意味が、上で登録した意味と一致しません。単語の意味と同じ表記で入力してください。`);
   if(!e.original.includes(e.target))return alert(`例文 ${i+1} の対象語句「${e.target}」が原文に見つかりません。原文中の表記と一致させてください。`);
  }
  const old=db.words.find(w=>w.id===$('wordId').value);
@@ -230,10 +225,12 @@ const AI_IMPORT_PROMPT = `あなたは古文単語帳のデータ入力アシス
 【このアプリの出題方式】
 - 単語だけの問題は、アプリ側で意味の5択問題として出題します。
 - 例文の問題は、選択肢を使わない記入式です。学習者が対象語句の意味を回答欄に直接入力します。
+- 単語登録画面でも、各例文の「この例文で出題する意味」はプルダウンではなく自由入力欄です。JSONのexamples[].meaningには、その入力欄へ入れる意味の文章を直接出力してください。
 - そのため、選択肢・選択肢番号・正解候補一覧などの項目は作らないでください。指定されたJSON形式だけを出力してください。
 - examplesのmeaningには、学習者が記入する正解となる意味を1つだけ設定してください。複数の意味をスラッシュ等でまとめないでください。
 - meaningは meanings 配列内のいずれか1つのtextと完全一致させてください。アプリは入力された答えとこの文字列を照合します。
 - meaningは採点しやすいよう、画像に記載された意味を保った簡潔な表現にしてください。解説や例文の現代語訳をmeaningに混ぜないでください。
+- meaningは単語のmeanings配列に登録したtextのいずれか1つと完全一致させてください。意味の番号や配列の添字ではなく、意味そのものの文字列を入れてください。
 
 【厳守事項】
 - 画像に載っている単語をすべて、上から順番に words 配列へ入れてください。一度に複数単語を出力してください。
