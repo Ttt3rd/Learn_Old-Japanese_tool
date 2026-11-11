@@ -227,6 +227,14 @@ const AI_IMPORT_PROMPT = `あなたは古文単語帳のデータ入力アシス
   ]
 }
 
+【このアプリの出題方式】
+- 単語だけの問題は、アプリ側で意味の5択問題として出題します。
+- 例文の問題は、選択肢を使わない記入式です。学習者が対象語句の意味を回答欄に直接入力します。
+- そのため、選択肢・選択肢番号・正解候補一覧などの項目は作らないでください。指定されたJSON形式だけを出力してください。
+- examplesのmeaningには、学習者が記入する正解となる意味を1つだけ設定してください。複数の意味をスラッシュ等でまとめないでください。
+- meaningは meanings 配列内のいずれか1つのtextと完全一致させてください。アプリは入力された答えとこの文字列を照合します。
+- meaningは採点しやすいよう、画像に記載された意味を保った簡潔な表現にしてください。解説や例文の現代語訳をmeaningに混ぜないでください。
+
 【厳守事項】
 - 画像に載っている単語をすべて、上から順番に words 配列へ入れてください。一度に複数単語を出力してください。
 - kanaは必ずひらがなにしてください。漢字表記がない場合はkanjiを空文字にしてください。
@@ -386,7 +394,7 @@ function showSentence(){
  const ex=current.activeExample;
  let sentence=esc(ex.original);
  sentence=sentence.replace(esc(ex.target),`<u><b>${esc(ex.target)}</b></u>`);
- $('questionArea').innerHTML=`<div class="muted">傍線部の意味を答えよう。</div><div class="sentence">${sentence}</div><label for="writtenAnswer">対象語句の現代語訳</label><input id="writtenAnswer" placeholder="意味を入力"><p class="hint">答えを入力したら「答えを見る」を押してください。</p><div class="actions"><button class="primary" id="reveal">答えを見る</button></div>`;
+ $('questionArea').innerHTML=`<div class="muted">傍線部の意味を答えよう。</div><div class="sentence">${sentence}</div><label for="writtenAnswer">答え（対象語句の意味）</label><input id="writtenAnswer" type="text" autocomplete="off" spellcheck="false" placeholder="意味を文章で入力"><p class="hint">選択肢はありません。意味を直接入力してから「答えを見る」を押してください。</p><div class="actions"><button class="primary" id="reveal">答えを見る</button></div>`;
  $('reveal').onclick=()=>{
   if(!$('writtenAnswer').value.trim())return alert('答えを入力してください。');
   const m=current.meanings[ex.meaningIndex];
